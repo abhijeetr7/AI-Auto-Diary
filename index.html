@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto-Diary from Your Calendar</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Custom styles for Inter font and general body styling */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Light gray background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to start to allow scrolling if content is tall */
+            min-height: 100vh;
+            padding: 2rem 1rem; /* Padding for mobile and desktop */
+            box-sizing: border-box;
+        }
+        /* Custom scrollbar for textareas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+
+        /* Hide print buttons when printing */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white;
+                padding: 0;
+            }
+            .container {
+                box-shadow: none;
+                border: none;
+                width: auto !important;
+                max-width: 100% !important;
+                margin: 0;
+                padding: 1rem;
+            }
+            #journalEntryEditor {
+                display: none !important; /* Ensure editor is hidden during print */
+            }
+            #journalEntryDisplay {
+                display: block !important; /* Ensure display is visible during print */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container bg-white p-8 rounded-xl shadow-lg w-full max-w-3xl border border-gray-200">
+        <h1 class="text-4xl font-extrabold text-gray-900 mb-6 text-center">
+            <i class="fas fa-book-open text-blue-600 mr-3"></i>Auto-Diary
+        </h1>
+        <p class="text-gray-600 mb-8 text-center">
+            Paste your daily calendar events below, and I'll help you summarize them into a journal entry!
+        </p>
+
+        <!-- Calendar Event Input Section -->
+        <div class="mb-8 p-6 bg-blue-50 rounded-lg border border-blue-200">
+            <label for="calendarEvents" class="block text-lg font-semibold text-blue-800 mb-3">
+                <i class="fas fa-calendar-alt mr-2"></i>Your Calendar Events (Paste here):
+            </label>
+            <textarea id="calendarEvents" rows="8"
+                      class="w-full p-4 border border-blue-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-gray-800 resize-y"
+                      placeholder="e.g.,
+9:00 AM - Team Standup
+10:30 AM - Project X Meeting (Discuss Q3 roadmap)
+1:00 PM - Lunch with Sarah
+3:00 PM - Code Review for Feature Y
+5:00 PM - Gym"></textarea>
+            <button id="generateBtn"
+                    class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md flex items-center justify-center">
+                <i class="fas fa-magic mr-2"></i>Generate Diary Entry
+            </button>
+            <div id="loadingIndicator" class="hidden mt-4 text-center text-blue-600">
+                <i class="fas fa-spinner fa-spin mr-2"></i>Generating your entry...
+            </div>
+        </div>
+
+        <!-- Journal Entry Display and Editor Section -->
+        <div class="mb-8 p-6 bg-green-50 rounded-lg border border-green-200">
+            <h2 class="text-2xl font-bold text-green-800 mb-4 flex items-center">
+                <i class="fas fa-pencil-alt mr-2"></i>Your Daily Journal Entry:
+            </h2>
+            <div id="journalEntryDisplay"
+                 class="p-4 bg-white border border-gray-300 rounded-lg min-h-[150px] text-gray-800 leading-relaxed whitespace-pre-wrap shadow-inner">
+                Your generated diary entry will appear here.
+            </div>
+            <textarea id="journalEntryEditor" rows="10"
+                      class="hidden w-full p-4 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500 text-gray-800 resize-y shadow-inner"></textarea>
+
+            <div class="flex flex-col sm:flex-row justify-end mt-4 space-y-3 sm:space-y-0 sm:space-x-3 no-print">
+                <button id="editBtn"
+                        class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-5 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md flex items-center justify-center">
+                    <i class="fas fa-edit mr-2"></i>Edit Entry
+                </button>
+                <button id="downloadBtn"
+                        class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-5 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md flex items-center justify-center">
+                    <i class="fas fa-download mr-2"></i>Download
+                </button>
+                <button id="printBtn"
+                        class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-5 rounded-lg transition duration-300 ease-in-out transform hover:scale-105 shadow-md flex items-center justify-center">
+                    <i class="fas fa-print mr-2"></i>Print
+                </button>
+            </div>
+        </div>
+
+        <!-- Message Box for alerts -->
+        <div id="messageBox" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+            <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm w-full border border-gray-300">
+                <p id="messageText" class="text-lg font-semibold text-gray-800 mb-4"></p>
+                <button id="closeMessageBox" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-lg transition duration-200">
+                    OK
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Global variables for Firebase configuration, if needed in the future.
+        // For this application, we are not using Firebase persistence.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // DOM Elements
+        const calendarEventsInput = document.getElementById('calendarEvents');
+        const generateBtn = document.getElementById('generateBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const journalEntryDisplay = document.getElementById('journalEntryDisplay');
+        const journalEntryEditor = document.getElementById('journalEntryEditor');
+        const editBtn = document.getElementById('editBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const printBtn = document.getElementById('printBtn');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const closeMessageBox = document.getElementById('closeMessageBox');
+
+        let isEditing = false; // State to track if the entry is being edited
+
+        // Function to display custom messages (replaces alert())
+        function showMessageBox(message) {
+            messageText.textContent = message;
+            messageBox.classList.remove('hidden');
+        }
+
+        // Event listener for closing the message box
+        closeMessageBox.addEventListener('click', () => {
+            messageBox.classList.add('hidden');
+        });
+
+        // Function to generate the diary entry using the Gemini API
+        async function generateDiaryEntry() {
+            const events = calendarEventsInput.value.trim();
+
+            if (!events) {
+                showMessageBox("Please paste some calendar events to generate a diary entry.");
+                return;
+            }
+
+            // Show loading indicator and disable button
+            loadingIndicator.classList.remove('hidden');
+            generateBtn.disabled = true;
+            generateBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            try {
+                // Construct the prompt for the LLM
+                const prompt = `Based on the following daily calendar events, write a concise and reflective diary entry. Focus on summarizing the key activities, outcomes, and any notable feelings or thoughts related to the events. Make it sound like a personal journal entry.
+
+Calendar Events:
+${events}
+
+Diary Entry:`;
+
+                let chatHistory = [];
+                chatHistory.push({ role: "user", parts: [{ text: prompt }] });
+
+                const payload = { contents: chatHistory };
+                const apiKey = ""; // Canvas will provide this at runtime for gemini-2.0-flash
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('API Error:', errorData);
+                    throw new Error(`API request failed with status ${response.status}: ${errorData.error.message || 'Unknown error'}`);
+                }
+
+                const result = await response.json();
+
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    journalEntryDisplay.textContent = text; // Update the display area
+                    journalEntryEditor.value = text; // Also update the editor area
+                } else {
+                    showMessageBox("Could not generate a diary entry. The AI response was empty or malformed.");
+                    console.error("Unexpected API response structure:", result);
+                }
+
+            } catch (error) {
+                console.error("Error generating diary entry:", error);
+                showMessageBox(`Failed to generate diary entry: ${error.message}. Please try again.`);
+            } finally {
+                // Hide loading indicator and re-enable button
+                loadingIndicator.classList.add('hidden');
+                generateBtn.disabled = false;
+                generateBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // Function to toggle between display and edit mode
+        function toggleEditMode() {
+            if (isEditing) {
+                // Currently editing, switch to display mode (Save)
+                journalEntryDisplay.textContent = journalEntryEditor.value;
+                journalEntryDisplay.classList.remove('hidden');
+                journalEntryEditor.classList.add('hidden');
+                editBtn.innerHTML = '<i class="fas fa-edit mr-2"></i>Edit Entry';
+            } else {
+                // Currently displaying, switch to edit mode
+                journalEntryEditor.value = journalEntryDisplay.textContent;
+                journalEntryDisplay.classList.add('hidden');
+                journalEntryEditor.classList.remove('hidden');
+                editBtn.innerHTML = '<i class="fas fa-save mr-2"></i>Save Entry';
+            }
+            isEditing = !isEditing;
+        }
+
+        // Function to download the journal entry as a text file
+        function downloadJournal() {
+            const entryContent = journalEntryDisplay.textContent;
+            if (!entryContent || entryContent.trim() === "Your generated diary entry will appear here.") {
+                showMessageBox("There's no diary entry to download yet!");
+                return;
+            }
+
+            const filename = `AutoDiary_Entry_${new Date().toISOString().slice(0, 10)}.txt`;
+            const blob = new Blob([entryContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a); // Append to body to ensure it's in the DOM
+            a.click(); // Programmatically click the link to trigger download
+            document.body.removeChild(a); // Clean up
+            URL.revokeObjectURL(url); // Release the object URL
+        }
+
+        // Function to print the journal entry
+        function printJournal() {
+            const entryContent = journalEntryDisplay.textContent;
+            if (!entryContent || entryContent.trim() === "Your generated diary entry will appear here.") {
+                showMessageBox("There's no diary entry to print yet!");
+                return;
+            }
+            window.print();
+        }
+
+        // Event Listeners
+        generateBtn.addEventListener('click', generateDiaryEntry);
+        editBtn.addEventListener('click', toggleEditMode);
+        downloadBtn.addEventListener('click', downloadJournal);
+        printBtn.addEventListener('click', printJournal);
+
+        // Initial state: ensure editor is hidden and display is visible
+        window.onload = () => {
+            journalEntryEditor.classList.add('hidden');
+            journalEntryDisplay.classList.remove('hidden');
+        };
+
+    </script>
+</body>
+</html>
